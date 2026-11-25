@@ -153,7 +153,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <LayoutGroup id="desktop-sidebar-nav">
           <nav
             onMouseLeave={() => setHoveredNav(null)}
-            className="flex-1 min-h-0 overflow-y-auto p-2 space-y-0.5"
+            className="sidebar-scrollbar flex-1 min-h-0 min-w-0 overflow-y-scroll overflow-x-hidden overscroll-contain p-2 space-y-0.5"
             aria-label="Main Navigation"
           >
             {navItems.map((item) => {

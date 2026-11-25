@@ -80,6 +80,16 @@
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
+.dark {
+  --sidebar-scrollbar-thumb: #514943;
+  --sidebar-scrollbar-thumb-hover: #EA5003;
+}
+
+:root {
+  --sidebar-scrollbar-thumb: #EA5003;
+  --sidebar-scrollbar-thumb-hover: #EA5003;
+}
+
 @theme inline {
   --color-background: var(--bg-app);
   --color-foreground: var(--text-primary);
@@ -138,7 +148,7 @@ h1, h2, h3, h4, .font-heading {
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #F3F0ED;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -146,6 +156,35 @@ h1, h2, h3, h4, .font-heading {
   border-radius: 9999px;
 }
 
+.sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-scrollbar-thumb) #F3F0ED;
+  scrollbar-gutter: stable;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: #F3F0ED;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: #EA5003;
+  border-radius: 9999px;
+  min-height: 40px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #D44702;
+}
 @keyframes shimmer {
   100% {
     transform: translateX(100%);

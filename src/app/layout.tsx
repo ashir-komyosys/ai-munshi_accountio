@@ -52,7 +52,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${inter.variable} ${jakarta.variable} ${orbitron.variable} ${notoArabic.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-[var(--bg-app)] text-[var(--text-primary)]">
+      <body suppressHydrationWarning className="min-h-full bg-[var(--bg-app)] text-[var(--text-primary)]">
         <AppProviders>{children}</AppProviders>
       </body>
     </html>
