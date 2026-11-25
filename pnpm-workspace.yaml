@@ -1,6 +1,6 @@
+packages:
+  - '.'
+
 onlyBuiltDependencies:
   - core-js
-
-allowBuilds:
-  sharp: false
-  unrs-resolver: false
+  - "@tanstack/react-table"
