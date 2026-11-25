@@ -22,8 +22,10 @@ import {
   User as UserIcon,
   Users,
 } from "lucide-react";
+import { LayoutGroup } from "motion/react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/common/StatusStates";
+import { SlidingIndicator } from "@/components/motion/SlidingIndicator";
 import { Badge, Button, Card, Input, Modal, Select } from "@/components/ui/primitives";
 import { resetDemoDatabase } from "@/database/seed";
 import { formatPKR } from "@/lib/money";
@@ -160,26 +162,34 @@ export function SettingsWorkspace({ section = "business" }: { section?: Settings
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Left Sub-Nav (Matches Screen 9) */}
-        <Card className="p-2.5 space-y-1 h-fit">
-          {SETTINGS_NAV.map((item) => {
-            const Icon = item.icon;
-            const active = section === item.key;
-            return (
-              <Link
-                key={item.key}
-                href={item.href}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-colors ${
-                  active
-                    ? "bg-[var(--brand-primary)] text-white"
-                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </Card>
+        <LayoutGroup id="settings-sub-nav">
+          <Card className="p-2.5 space-y-1 h-fit">
+            {SETTINGS_NAV.map((item) => {
+              const Icon = item.icon;
+              const active = section === item.key;
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  className={`relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-colors ${
+                    active
+                      ? "text-white"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--brand-cream)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {active && (
+                    <SlidingIndicator
+                      layoutId="settings-active-pill"
+                      className="bg-[var(--brand-primary)] shadow-xs"
+                    />
+                  )}
+                  <Icon className="relative z-10 h-4 w-4 shrink-0" />
+                  <span className="relative z-10">{item.label}</span>
+                </Link>
+              );
+            })}
+          </Card>
+        </LayoutGroup>
 
         {/* Right Panel */}
         <Card className="p-5 sm:p-6 lg:col-span-3 space-y-5">

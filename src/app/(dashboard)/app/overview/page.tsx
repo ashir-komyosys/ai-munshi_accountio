@@ -28,9 +28,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { AnimatePresence, motion } from "motion/react";
 import { AiMunshiMascot } from "@/components/common/BrandAssets";
 import { FinancialAmount } from "@/components/common/FinancialAmount";
 import { LoadingSkeleton } from "@/components/common/StatusStates";
+import { AnimatedCard } from "@/components/motion/AnimatedCard";
+import { AnimatedListItem } from "@/components/motion/AnimatedList";
+import { AnimatedTableRow } from "@/components/motion/AnimatedTableRow";
 import { QuickEntryModal } from "@/components/transactions/QuickEntryModal";
 import { Badge, Card, Input } from "@/components/ui/primitives";
 import { useDictionary } from "@/hooks/useDictionary";
@@ -149,7 +153,7 @@ export default function OverviewPage() {
 
         {/* Primary 4 Financial Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-5">
-          <Card className="p-4">
+          <AnimatedCard delay={0} className="p-4">
             <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
               <span className="flex items-center gap-1.5 font-medium">
                 <TrendingUp className="h-3.5 w-3.5 text-[var(--status-success)]" />
@@ -158,11 +162,11 @@ export default function OverviewPage() {
               <Badge tone="success">+12.4%</Badge>
             </div>
             <p className="text-xl sm:text-2xl font-bold mt-2">
-              <FinancialAmount amount={summary.totalSales} />
+              <FinancialAmount amount={summary.totalSales} animate />
             </p>
-          </Card>
+          </AnimatedCard>
 
-          <Card className="p-4">
+          <AnimatedCard delay={0.04} className="p-4">
             <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
               <span className="flex items-center gap-1.5 font-medium">
                 <ShoppingCart className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
@@ -171,11 +175,11 @@ export default function OverviewPage() {
               <Badge tone="success">+6.9%</Badge>
             </div>
             <p className="text-xl sm:text-2xl font-bold mt-2">
-              <FinancialAmount amount={summary.totalPurchases} />
+              <FinancialAmount amount={summary.totalPurchases} animate />
             </p>
-          </Card>
+          </AnimatedCard>
 
-          <Card className="p-4">
+          <AnimatedCard delay={0.08} className="p-4">
             <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
               <span className="flex items-center gap-1.5 font-medium">
                 <Receipt className="h-3.5 w-3.5 text-[var(--status-danger)]" />
@@ -184,11 +188,11 @@ export default function OverviewPage() {
               <Badge tone="danger">-4.1%</Badge>
             </div>
             <p className="text-xl sm:text-2xl font-bold mt-2">
-              <FinancialAmount amount={summary.totalExpenses} />
+              <FinancialAmount amount={summary.totalExpenses} animate />
             </p>
-          </Card>
+          </AnimatedCard>
 
-          <Card className="p-4">
+          <AnimatedCard delay={0.12} className="p-4">
             <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
               <span className="flex items-center gap-1.5 font-medium">
                 <Wallet className="h-3.5 w-3.5 text-[var(--status-info)]" />
@@ -197,9 +201,9 @@ export default function OverviewPage() {
               <Badge tone="success">+18.6%</Badge>
             </div>
             <p className="text-xl sm:text-2xl font-bold mt-2">
-              <FinancialAmount amount={summary.netProfit} colored />
+              <FinancialAmount amount={summary.netProfit} colored animate />
             </p>
-          </Card>
+          </AnimatedCard>
         </div>
 
         {/* Expandable Additional Metrics */}
@@ -213,34 +217,44 @@ export default function OverviewPage() {
             {t.overview.moreMetrics} (Cash, Bank, Receivables, Payables)
           </button>
 
-          {showMoreMetrics && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-3">
-              <Card className="p-3.5">
-                <p className="text-xs text-[var(--text-secondary)]">{t.overview.cashBalance}</p>
-                <p className="text-lg font-bold mt-1">
-                  <FinancialAmount amount={summary.cashBalance} />
-                </p>
-              </Card>
-              <Card className="p-3.5">
-                <p className="text-xs text-[var(--text-secondary)]">{t.overview.bankBalance}</p>
-                <p className="text-lg font-bold mt-1">
-                  <FinancialAmount amount={summary.bankBalance} />
-                </p>
-              </Card>
-              <Card className="p-3.5">
-                <p className="text-xs text-[var(--text-secondary)]">{t.overview.receivables}</p>
-                <p className="text-lg font-bold mt-1 text-[var(--status-success)]">
-                  <FinancialAmount amount={summary.totalReceivables} />
-                </p>
-              </Card>
-              <Card className="p-3.5">
-                <p className="text-xs text-[var(--text-secondary)]">{t.overview.payables}</p>
-                <p className="text-lg font-bold mt-1 text-[var(--status-danger)]">
-                  <FinancialAmount amount={summary.totalPayables} />
-                </p>
-              </Card>
-            </div>
-          )}
+          <AnimatePresence>
+            {showMoreMetrics && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-3">
+                  <AnimatedCard interactive={false} className="p-3.5">
+                    <p className="text-xs text-[var(--text-secondary)]">{t.overview.cashBalance}</p>
+                    <p className="text-lg font-bold mt-1">
+                      <FinancialAmount amount={summary.cashBalance} animate />
+                    </p>
+                  </AnimatedCard>
+                  <AnimatedCard interactive={false} delay={0.03} className="p-3.5">
+                    <p className="text-xs text-[var(--text-secondary)]">{t.overview.bankBalance}</p>
+                    <p className="text-lg font-bold mt-1">
+                      <FinancialAmount amount={summary.bankBalance} animate />
+                    </p>
+                  </AnimatedCard>
+                  <AnimatedCard interactive={false} delay={0.06} className="p-3.5">
+                    <p className="text-xs text-[var(--text-secondary)]">{t.overview.receivables}</p>
+                    <p className="text-lg font-bold mt-1 text-[var(--status-success)]">
+                      <FinancialAmount amount={summary.totalReceivables} animate />
+                    </p>
+                  </AnimatedCard>
+                  <AnimatedCard interactive={false} delay={0.09} className="p-3.5">
+                    <p className="text-xs text-[var(--text-secondary)]">{t.overview.payables}</p>
+                    <p className="text-lg font-bold mt-1 text-[var(--status-danger)]">
+                      <FinancialAmount amount={summary.totalPayables} animate />
+                    </p>
+                  </AnimatedCard>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </Card>
 
@@ -308,16 +322,19 @@ export default function OverviewPage() {
           ].map((act) => {
             const Icon = act.icon;
             return (
-              <button
+              <motion.button
                 key={act.label}
                 type="button"
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ duration: 0.14 }}
                 onClick={act.onClick}
-                className="flex flex-col items-center justify-center p-3 rounded-xl border border-[var(--border-default)] bg-[var(--bg-app)] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-cream)] transition-colors text-center cursor-pointer"
+                className="flex flex-col items-center justify-center p-3 rounded-xl border border-[var(--border-default)] bg-[var(--bg-app)] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-cream)] hover:shadow-[var(--shadow-xs)] transition-colors text-center cursor-pointer"
               >
                 <Icon className={`h-5 w-5 mb-1.5 ${act.color}`} />
                 <span className="text-xs font-semibold">{act.label}</span>
                 <span className="text-[10px] text-[var(--text-secondary)]">{act.sub}</span>
-              </button>
+              </motion.button>
             );
           })}
         </div>
@@ -356,25 +373,26 @@ export default function OverviewPage() {
             </Link>
           </div>
           <div className="space-y-2.5">
-            {topOutstanding.map((p) => (
-              <Link
-                key={p.id}
-                href={`/app/khatas/${p.id}`}
-                className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[var(--bg-subtle)] border border-[var(--border-default)]"
-              >
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold truncate">{p.name}</p>
-                  <p className="text-[11px] text-[var(--text-secondary)] capitalize">{p.type}</p>
-                </div>
-                <div className="text-end shrink-0">
-                  <Badge tone={p.currentBalance > 0 ? "success" : "danger"}>
-                    {p.currentBalance > 0 ? t.khata.lenaHai : t.khata.denaHai}
-                  </Badge>
-                  <p className="text-xs font-bold mt-0.5 tabular-nums">
-                    {formatPKR(Math.abs(p.currentBalance))}
-                  </p>
-                </div>
-              </Link>
+            {topOutstanding.map((p, idx) => (
+              <AnimatedListItem key={p.id} index={idx}>
+                <Link
+                  href={`/app/khatas/${p.id}`}
+                  className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[var(--bg-subtle)] border border-[var(--border-default)] transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold truncate">{p.name}</p>
+                    <p className="text-[11px] text-[var(--text-secondary)] capitalize">{p.type}</p>
+                  </div>
+                  <div className="text-end shrink-0">
+                    <Badge tone={p.currentBalance > 0 ? "success" : "danger"}>
+                      {p.currentBalance > 0 ? t.khata.lenaHai : t.khata.denaHai}
+                    </Badge>
+                    <p className="text-xs font-bold mt-0.5 tabular-nums">
+                      {formatPKR(Math.abs(p.currentBalance))}
+                    </p>
+                  </div>
+                </Link>
+              </AnimatedListItem>
             ))}
           </div>
         </Card>
@@ -402,9 +420,10 @@ export default function OverviewPage() {
               </tr>
             </thead>
             <tbody>
-              {transactions.slice(0, 6).map((tx) => (
-                <tr
+              {transactions.slice(0, 6).map((tx, idx) => (
+                <AnimatedTableRow
                   key={tx.id}
+                  index={idx}
                   onClick={() => router.push(`/app/transactions/${tx.id}`)}
                   className="border-b border-[var(--border-default)]/60 hover:bg-[var(--bg-subtle)] cursor-pointer"
                 >
@@ -418,7 +437,7 @@ export default function OverviewPage() {
                   <td className="py-2.5 text-end font-semibold tabular-nums">
                     {formatPKR(tx.totalAmount)}
                   </td>
-                </tr>
+                </AnimatedTableRow>
               ))}
             </tbody>
           </table>

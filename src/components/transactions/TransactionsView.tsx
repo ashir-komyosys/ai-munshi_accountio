@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Search } from "lucide-react";
 import { EmptyState, LoadingSkeleton, PageHeader } from "@/components/common/StatusStates";
+import { AnimatedTabs } from "@/components/motion/AnimatedTabs";
 import { QuickEntryModal } from "@/components/transactions/QuickEntryModal";
 import { Badge, Button, Card, Input } from "@/components/ui/primitives";
 import { formatPKR } from "@/lib/money";
@@ -102,33 +103,25 @@ export function TransactionsView({
       />
 
       {/* Filter Pills */}
-      <div className="flex flex-wrap gap-1.5">
-        {(
-          [
-            { key: "all", label: "All" },
-            { key: "sales", label: "Sales" },
-            { key: "purchases", label: "Purchase" },
-            { key: "receipts", label: "Receive" },
-            { key: "payments", label: "Pay" },
-            { key: "expenses", label: "Expense" },
-            { key: "transfers", label: "Transfers" },
-            { key: "returns", label: "Returns" },
-            { key: "journals", label: "Journals" },
-          ] as const
-        ).map((tab) => (
-          <Button
-            key={tab.key}
-            size="sm"
-            variant={group === tab.key ? "primary" : "outline"}
-            onClick={() => {
-              setGroup(tab.key);
-              setPage(1);
-            }}
-          >
-            {tab.label}
-          </Button>
-        ))}
-      </div>
+      <AnimatedTabs
+        layoutId="transactions-filter-tabs"
+        value={group}
+        onChange={(next) => {
+          setGroup(next);
+          setPage(1);
+        }}
+        items={[
+          { value: "all", label: "All" },
+          { value: "sales", label: "Sales" },
+          { value: "purchases", label: "Purchase" },
+          { value: "receipts", label: "Receive" },
+          { value: "payments", label: "Pay" },
+          { value: "expenses", label: "Expense" },
+          { value: "transfers", label: "Transfers" },
+          { value: "returns", label: "Returns" },
+          { value: "journals", label: "Journals" },
+        ]}
+      />
 
       {/* Search & Date Range */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">

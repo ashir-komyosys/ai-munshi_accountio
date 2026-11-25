@@ -7,6 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus, Search } from "lucide-react";
 import { FinancialAmount } from "@/components/common/FinancialAmount";
 import { EmptyState, LoadingSkeleton, PageHeader } from "@/components/common/StatusStates";
+import { AnimatedCard } from "@/components/motion/AnimatedCard";
+import { AnimatedTabs } from "@/components/motion/AnimatedTabs";
 import { Badge, Button, Card, Input, Select } from "@/components/ui/primitives";
 import { useDictionary } from "@/hooks/useDictionary";
 import { formatPKR } from "@/lib/money";
@@ -80,48 +82,40 @@ export default function KhatasPage() {
 
       {/* Summary Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Card className="p-4 flex items-center justify-between">
+        <AnimatedCard className="p-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-[var(--text-secondary)]">Total {t.khata.lenaHai} (Receivable)</p>
             <p className="text-xl font-bold text-[var(--status-success)] mt-1">
-              <FinancialAmount amount={totalLena} />
+              <FinancialAmount amount={totalLena} animate />
             </p>
           </div>
           <Badge tone="success">Receivable</Badge>
-        </Card>
-        <Card className="p-4 flex items-center justify-between">
+        </AnimatedCard>
+        <AnimatedCard delay={0.04} className="p-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-[var(--text-secondary)]">Total {t.khata.denaHai} (Payable)</p>
             <p className="text-xl font-bold text-[var(--status-danger)] mt-1">
-              <FinancialAmount amount={totalDena} />
+              <FinancialAmount amount={totalDena} animate />
             </p>
           </div>
           <Badge tone="danger">Payable</Badge>
-        </Card>
+        </AnimatedCard>
       </div>
 
       {/* Category Tabs */}
-      <div className="flex flex-wrap items-center gap-2">
-        {(
-          [
-            { key: "customer", label: t.khata.customers },
-            { key: "supplier", label: t.khata.suppliers },
-            { key: "other", label: t.khata.others },
-          ] as const
-        ).map((item) => (
-          <Button
-            key={item.key}
-            size="sm"
-            variant={tab === item.key ? "primary" : "outline"}
-            onClick={() => {
-              setTab(item.key);
-              setPage(1);
-            }}
-          >
-            {item.label}
-          </Button>
-        ))}
-      </div>
+      <AnimatedTabs
+        layoutId="khata-category-tabs"
+        value={tab}
+        onChange={(next) => {
+          setTab(next);
+          setPage(1);
+        }}
+        items={[
+          { value: "customer", label: t.khata.customers },
+          { value: "supplier", label: t.khata.suppliers },
+          { value: "other", label: t.khata.others },
+        ]}
+      />
 
       {/* Search & Filters */}
       <div className="flex flex-col sm:flex-row gap-2.5">

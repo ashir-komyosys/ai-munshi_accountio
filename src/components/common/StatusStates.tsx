@@ -1,23 +1,26 @@
 "use client";
 
 import React from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { AlertCircle, Inbox, RefreshCw } from "lucide-react";
+import { AnimatedSkeleton } from "@/components/motion/AnimatedSkeleton";
 import { Button, Card } from "@/components/ui/primitives";
+import { emptyStateVariants } from "@/lib/motion/variants";
 
 export function LoadingSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="space-y-3" aria-busy="true" aria-label="Loading content">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[1, 2, 3, 4].map((i) => (
-          <div
+          <AnimatedSkeleton
             key={i}
-            className="h-24 rounded-2xl bg-[var(--bg-subtle)] animate-pulse border border-[var(--border-default)]"
+            className="h-24 rounded-2xl border border-[var(--border-default)]"
           />
         ))}
       </div>
       <Card className="p-4 space-y-3">
         {Array.from({ length: rows }).map((_, idx) => (
-          <div key={idx} className="h-10 rounded-xl bg-[var(--bg-subtle)] animate-pulse" />
+          <AnimatedSkeleton key={idx} className="h-10 rounded-xl" />
         ))}
       </Card>
     </div>
@@ -35,19 +38,27 @@ export function EmptyState({
   actionLabel?: string;
   onAction?: () => void;
 }) {
+  const reduced = useReducedMotion();
+
   return (
-    <Card className="p-10 flex flex-col items-center justify-center text-center">
-      <div className="h-12 w-12 rounded-2xl bg-[var(--brand-cream)] flex items-center justify-center text-[var(--brand-primary)] mb-3">
-        <Inbox className="h-6 w-6" />
-      </div>
-      <h3 className="font-heading text-base font-semibold text-[var(--text-primary)]">{title}</h3>
-      <p className="text-sm text-[var(--text-secondary)] max-w-sm mt-1">{description}</p>
-      {actionLabel && onAction && (
-        <Button onClick={onAction} className="mt-4" size="sm">
-          {actionLabel}
-        </Button>
-      )}
-    </Card>
+    <motion.div
+      variants={reduced ? undefined : emptyStateVariants}
+      initial={reduced ? undefined : "initial"}
+      animate={reduced ? undefined : "animate"}
+    >
+      <Card className="p-10 flex flex-col items-center justify-center text-center">
+        <div className="h-12 w-12 rounded-2xl bg-[var(--brand-cream)] flex items-center justify-center text-[var(--brand-primary)] mb-3">
+          <Inbox className="h-6 w-6" />
+        </div>
+        <h3 className="font-heading text-base font-semibold text-[var(--text-primary)]">{title}</h3>
+        <p className="text-sm text-[var(--text-secondary)] max-w-sm mt-1">{description}</p>
+        {actionLabel && onAction && (
+          <Button onClick={onAction} className="mt-4" size="sm">
+            {actionLabel}
+          </Button>
+        )}
+      </Card>
+    </motion.div>
   );
 }
 
@@ -58,19 +69,27 @@ export function ErrorState({
   message?: string;
   onRetry?: () => void;
 }) {
+  const reduced = useReducedMotion();
+
   return (
-    <Card className="p-8 flex flex-col items-center justify-center text-center border-[var(--status-danger)]/30">
-      <div className="h-11 w-11 rounded-2xl bg-[var(--status-danger-bg)] flex items-center justify-center text-[var(--status-danger)] mb-3">
-        <AlertCircle className="h-5 w-5" />
-      </div>
-      <h3 className="font-heading text-base font-semibold">Unable to Load</h3>
-      <p className="text-sm text-[var(--text-secondary)] mt-1">{message}</p>
-      {onRetry && (
-        <Button variant="outline" size="sm" onClick={onRetry} className="mt-4">
-          <RefreshCw className="h-3.5 w-3.5" /> Retry
-        </Button>
-      )}
-    </Card>
+    <motion.div
+      variants={reduced ? undefined : emptyStateVariants}
+      initial={reduced ? undefined : "initial"}
+      animate={reduced ? undefined : "animate"}
+    >
+      <Card className="p-8 flex flex-col items-center justify-center text-center border-[var(--status-danger)]/30">
+        <div className="h-11 w-11 rounded-2xl bg-[var(--status-danger-bg)] flex items-center justify-center text-[var(--status-danger)] mb-3">
+          <AlertCircle className="h-5 w-5" />
+        </div>
+        <h3 className="font-heading text-base font-semibold">Unable to Load</h3>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">{message}</p>
+        {onRetry && (
+          <Button variant="outline" size="sm" onClick={onRetry} className="mt-4">
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </Button>
+        )}
+      </Card>
+    </motion.div>
   );
 }
 

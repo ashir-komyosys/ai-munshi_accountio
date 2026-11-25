@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, LoadingSkeleton, PageHeader } from "@/components/common/StatusStates";
+import { AnimatedCard } from "@/components/motion/AnimatedCard";
+import { AnimatedTabs } from "@/components/motion/AnimatedTabs";
 import { Badge, Button, Card, Input, Select } from "@/components/ui/primitives";
 import { services } from "@/services";
 import { useUIStore } from "@/stores/uiStore";
@@ -133,18 +135,12 @@ export default function DocumentsPage() {
         }
       />
 
-      <div className="flex flex-wrap gap-1.5">
-        {CATEGORIES.map((c) => (
-          <Button
-            key={c.key}
-            size="sm"
-            variant={cat === c.key ? "primary" : "outline"}
-            onClick={() => setCat(c.key)}
-          >
-            {c.label}
-          </Button>
-        ))}
-      </div>
+      <AnimatedTabs
+        layoutId="documents-category-tabs"
+        value={cat}
+        onChange={setCat}
+        items={CATEGORIES.map((c) => ({ value: c.key, label: c.label }))}
+      />
 
       <div className="flex items-center justify-between gap-2">
         <div className="relative flex-1 max-w-sm">
@@ -185,10 +181,10 @@ export default function DocumentsPage() {
         />
       ) : view === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filtered.map((doc) => {
+          {filtered.map((doc, idx) => {
             const isExcel = doc.fileName.endsWith(".xlsx") || doc.fileName.endsWith(".csv");
             return (
-              <Card key={doc.id} className="p-4 flex items-center justify-between gap-3">
+              <AnimatedCard key={doc.id} delay={idx * 0.03} className="p-4 flex items-center justify-between gap-3">
                 <Link href={`/app/documents/${doc.id}`} className="flex items-center gap-3 min-w-0">
                   <div
                     className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${
@@ -224,7 +220,7 @@ export default function DocumentsPage() {
                     <Trash2 className="h-4 w-4 text-[var(--status-danger)]" />
                   </Button>
                 </div>
-              </Card>
+              </AnimatedCard>
             );
           })}
         </div>

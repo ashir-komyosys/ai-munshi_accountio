@@ -1,42 +1,69 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
   Check,
   CheckCheck,
+  ChevronDown,
+  ChevronUp,
   Copy,
   FileText,
+  History,
   Image as ImageIcon,
   Mic,
   Paperclip,
   Plus,
   RefreshCw,
+  RotateCcw,
   Send,
+  Sparkles,
   Square,
   Trash2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AiMunshiMascot } from "@/components/common/BrandAssets";
+import { AnimatedSkeleton } from "@/components/motion/AnimatedSkeleton";
+import { AnimatedSuccess } from "@/components/motion/AnimatedSuccess";
+import { RecordingWaveform } from "@/components/motion/RecordingWaveform";
+import { TypingIndicator } from "@/components/motion/TypingIndicator";
 import { Badge, Button, Card } from "@/components/ui/primitives";
 import { useDictionary } from "@/hooks/useDictionary";
+import { messageVariants } from "@/lib/motion/variants";
 import { formatPKR } from "@/lib/money";
 import { cn, formatTime, generateId } from "@/lib/utils";
 import { services } from "@/services";
 import { useUIStore } from "@/stores/uiStore";
 import type { ChatAttachment, ChatMessage, InteractiveOption } from "@/types";
 
-const SUGGESTED_PROMPTS = [
-  "Aaj ka hisaab dikhao",
-  "Ali Traders se 150,000 ka yarn khareeda, 50,000 cash diya, baqi udhaar",
-  "Ibrahim Traders ko 90,000 ka maal udhaar becha",
-  "5,000 transport kharcha likh do",
-  "Stock kitna baqi hai?",
-  "Profit aur loss report dikhao",
-];
+const QUICK_ACTIONS = [
+  { label: "New Sale", prompt: "Ibrahim Traders ko 90,000 ka maal udhaar becha" },
+  {
+    label: "New Purchase",
+    prompt: "Ali Traders se 150,000 ka yarn khareeda, 50,000 cash diya, baqi udhaar",
+  },
+  { label: "Receive Payment", prompt: "Receive payment 50,000 from Ibrahim Traders" },
+  { label: "Pay Supplier", prompt: "Pay supplier Ali Traders 50,000" },
+  { label: "Check Khata", prompt: "Aaj ka khata summary dikhao" },
+  { label: "Today's Summary", prompt: "Aaj ka hisaab dikhao" },
+] as const;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDuration(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
 
 export function ChatInterface({
   compact = false,
@@ -55,6 +82,13 @@ export function ChatInterface({
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [chipsExpandedMobile, setChipsExpandedMobile] = useState(false);
+  const [failedDraft, setFailedDraft] = useState<{
+    text: string;
+    clientMessageId: string;
+    source?: ChatMessage["source"];
+    attachments?: ChatAttachment[];
+  } | null>(null);
 
   // Voice recording state (MediaRecorder API)
   const [isRecording, setIsRecording] = useState(false);
@@ -62,9 +96,13 @@ export function ChatInterface({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cancelledRef = useRef(false);
 
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [mountedAt] = useState(() => Date.now());
+  const reduced = useReducedMotion();
 
   const { data: conversation } = useQuery({
     queryKey: ["conversation", activeBookId],
@@ -77,12 +115,28 @@ export function ChatInterface({
     enabled: !!conversation?.id,
   });
 
-  useEffect(() => {
+  const scrollToBottom = (smooth = false) => {
     const el = listRef.current;
-    if (el) {
+    if (!el) return;
+    if (smooth) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    } else {
       el.scrollTop = el.scrollHeight;
     }
+  };
+
+  useEffect(() => {
+    scrollToBottom(false);
   }, [messages.length]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
 
   const invalidateAccounting = () => {
     queryClient.invalidateQueries({ queryKey: ["transactions"] });
@@ -111,9 +165,11 @@ export function ChatInterface({
       });
     },
     onSuccess: () => {
+      setFailedDraft(null);
       invalidateAccounting();
     },
-    onError: (err: Error) => {
+    onError: (err: Error, vars) => {
+      setFailedDraft(vars);
       toast.error(err.message || "Failed to send message");
     },
   });
@@ -149,17 +205,27 @@ export function ChatInterface({
     onSuccess: () => {
       invalidateAccounting();
     },
+    onError: (err: Error) => {
+      toast.error(err.message || "Action failed. Please try again.");
+    },
   });
 
   const handleSend = (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text && attachments.length === 0) return;
+    if (sendMutation.isPending) return;
     const clientMessageId = generateId("cm");
     const currentAttachments = [...attachments];
-    if (!overrideText) setInput("");
+    if (!overrideText) {
+      setInput("");
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+    }
     setAttachments([]);
+    setFailedDraft(null);
     sendMutation.mutate({
-      text: text || (currentAttachments[0]?.kind === "audio" ? "Voice note" : "Uploaded bill/image"),
+      text:
+        text ||
+        (currentAttachments[0]?.kind === "audio" ? "Voice note" : "Uploaded bill/image"),
       clientMessageId,
       source: currentAttachments.some((a) => a.kind === "audio") ? "voice_simulated" : "web",
       attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
@@ -198,26 +264,29 @@ export function ChatInterface({
       return;
     }
     try {
+      cancelledRef.current = false;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       audioChunksRef.current = [];
+      let secondsSnapshot = 0;
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
         stream.getTracks().forEach((tr) => tr.stop());
+        if (cancelledRef.current) return;
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const url = URL.createObjectURL(blob);
         setAttachments((prev) => [
           ...prev,
           {
             id: generateId("aud"),
-            name: `Voice-Note-${recordingSec}s.webm`,
+            name: `Voice-Note-${secondsSnapshot}s.webm`,
             mimeType: "audio/webm",
             sizeBytes: blob.size,
             dataUrl: url,
             kind: "audio",
-            durationSec: recordingSec,
+            durationSec: secondsSnapshot,
           },
         ]);
       };
@@ -226,7 +295,8 @@ export function ChatInterface({
       setIsRecording(true);
       setRecordingSec(0);
       timerRef.current = setInterval(() => {
-        setRecordingSec((s) => s + 1);
+        secondsSnapshot += 1;
+        setRecordingSec(secondsSnapshot);
       }, 1000);
     } catch {
       toast.error("Microphone permission denied or unavailable");
@@ -234,9 +304,20 @@ export function ChatInterface({
   };
 
   const stopVoiceRecording = () => {
+    cancelledRef.current = false;
     if (timerRef.current) clearInterval(timerRef.current);
     mediaRecorderRef.current?.stop();
     setIsRecording(false);
+  };
+
+  const cancelVoiceRecording = () => {
+    cancelledRef.current = true;
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    setRecordingSec(0);
   };
 
   const copyMessage = (id: string, text: string) => {
@@ -248,8 +329,7 @@ export function ChatInterface({
   return (
     <div
       className={cn(
-        "flex flex-col bg-[var(--bg-app)] rounded-2xl border border-[var(--border-default)] overflow-hidden",
-        compact ? "h-full" : "h-[calc(100vh-8.5rem)] min-h-[520px]"
+        "flex flex-col flex-1 min-h-0 min-w-0 bg-[var(--bg-app)] rounded-2xl border border-[var(--border-default)] overflow-hidden shadow-[var(--shadow-xs)]"
       )}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
@@ -257,59 +337,108 @@ export function ChatInterface({
         handleFileSelect(e.dataTransfer.files);
       }}
     >
-      {/* Top Demo Banner */}
-      <div className="px-4 py-2 bg-[var(--brand-cream)] border-b border-[var(--border-default)] flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <AiMunshiMascot size={26} />
-          <div>
-            <p className="text-xs font-semibold text-[var(--text-primary)]">AI Munshi</p>
-            <p className="text-[11px] text-[var(--text-secondary)]">{t.chat.simulatedNotice}</p>
+      {/* Unified Compact Header */}
+      {compact ? (
+        <div className="px-3 py-1.5 bg-[var(--brand-cream)] border-b border-[var(--border-default)] flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <AiMunshiMascot size={22} />
+            <p className="text-[11px] text-[var(--text-secondary)] truncate">
+              {t.chat.simulatedNotice}
+            </p>
           </div>
+          <Link
+            href="/app/munshi"
+            onClick={() => closeMunshiDrawer()}
+            className="text-[11px] font-medium text-[var(--brand-primary)] hover:underline whitespace-nowrap shrink-0"
+          >
+            Full View
+          </Link>
         </div>
-        <Badge tone="brand">Demo Mode</Badge>
-      </div>
+      ) : (
+        <div className="px-3.5 py-2.5 bg-[var(--brand-cream)] border-b border-[var(--border-default)] flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AiMunshiMascot size={30} className="shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="font-heading text-sm sm:text-base font-bold text-[var(--text-primary)] truncate">
+                  AI Munshi
+                </h1>
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-primary-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-primary)] whitespace-nowrap">
+                  <Sparkles className="h-2.5 w-2.5" />
+                  Simulated
+                </span>
+              </div>
+              <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                {t.chat.simulatedNotice}
+              </p>
+            </div>
+          </div>
+          <Link href="/app/munshi/history" className="shrink-0">
+            <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs whitespace-nowrap">
+              <History className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">History</span>
+            </Button>
+          </Link>
+        </div>
+      )}
 
-      {/* Messages Area */}
+      {/* Messages Area (only this container scrolls vertically) */}
       <div
         ref={listRef}
         onScroll={(e) => {
           const el = e.currentTarget;
-          setShowScrollBottom(el.scrollHeight - el.scrollTop - el.clientHeight > 120);
+          setShowScrollBottom(el.scrollHeight - el.scrollTop - el.clientHeight > 100);
         }}
-        className="flex-1 overflow-y-auto p-4 space-y-4 relative"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-4 sm:py-3.5 space-y-3 relative"
       >
         {isLoading && (
-          <p className="text-xs text-[var(--text-secondary)] text-center py-6">
-            Loading conversation...
-          </p>
+          <div className="space-y-3 py-2" aria-label="Loading conversation">
+            <div className="flex gap-2 items-start">
+              <AnimatedSkeleton className="h-7 w-7 rounded-full shrink-0" />
+              <AnimatedSkeleton className="h-14 w-56 sm:w-72 rounded-2xl border border-[var(--border-default)]" />
+            </div>
+            <div className="flex justify-end">
+              <AnimatedSkeleton className="h-10 w-44 sm:w-64 rounded-2xl" />
+            </div>
+            <div className="flex gap-2 items-start">
+              <AnimatedSkeleton className="h-7 w-7 rounded-full shrink-0" />
+              <AnimatedSkeleton className="h-28 w-64 sm:w-80 rounded-2xl border border-[var(--border-default)]" />
+            </div>
+          </div>
         )}
 
         {messages.map((msg) => {
           const isUser = msg.sender === "user";
+          const isNew = !reduced && Date.parse(msg.timestamp) >= mountedAt;
+          const Wrapper = isNew ? motion.div : "div";
+          const wrapperProps = isNew
+            ? { variants: messageVariants, initial: "initial", animate: "animate" }
+            : {};
           return (
-            <div
+            <Wrapper
               key={msg.id}
-              className={cn("flex gap-2.5", isUser ? "justify-end" : "justify-start")}
+              {...wrapperProps}
+              className={cn("flex gap-2 min-w-0", isUser ? "justify-end" : "justify-start")}
             >
-              {!isUser && <AiMunshiMascot size={32} className="mt-1 hidden sm:block" />}
-              <div className={cn("max-w-[88%] sm:max-w-[75%] space-y-2")}>
+              {!isUser && <AiMunshiMascot size={28} className="mt-0.5 hidden sm:block shrink-0" />}
+              <div className={cn("max-w-[90%] sm:max-w-[76%] lg:max-w-[68%] min-w-0 space-y-1.5")}>
                 <div
                   className={cn(
-                    "rounded-2xl px-4 py-2.5 text-sm shadow-[var(--shadow-xs)] border group relative",
+                    "rounded-2xl px-3.5 py-2 text-[13.5px] shadow-[var(--shadow-xs)] border group relative break-words",
                     isUser
                       ? "bg-[var(--chat-user-bubble)] text-[var(--chat-user-text)] border-transparent rounded-tr-sm"
                       : "bg-[var(--chat-ai-bubble)] text-[var(--text-primary)] border-[var(--border-default)] rounded-tl-sm"
                   )}
                 >
-                  <p className="whitespace-pre-line leading-relaxed">{msg.text}</p>
+                  <p className="whitespace-pre-line leading-snug">{msg.text}</p>
 
                   {/* Attachments */}
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className="mt-2 space-y-1.5">
                       {msg.attachments.map((att) =>
                         att.kind === "audio" && att.dataUrl ? (
-                          <div key={att.id} className="bg-black/5 rounded-xl p-2">
-                            <audio controls src={att.dataUrl} className="h-8 w-full max-w-[240px]" />
+                          <div key={att.id} className="bg-black/5 dark:bg-white/5 rounded-xl p-2">
+                            <audio controls src={att.dataUrl} className="h-8 w-full max-w-[230px]" />
                             <p className="text-[10px] opacity-75 mt-1">{t.chat.voiceNotice}</p>
                           </div>
                         ) : att.kind === "image" && att.dataUrl ? (
@@ -317,14 +446,14 @@ export function ChatInterface({
                             key={att.id}
                             src={att.dataUrl}
                             alt={att.name}
-                            className="max-h-44 rounded-xl border border-[var(--border-default)] object-cover"
+                            className="max-h-40 rounded-xl border border-[var(--border-default)] object-cover"
                           />
                         ) : (
                           <div
                             key={att.id}
-                            className="flex items-center gap-2 text-xs bg-black/5 px-2.5 py-1.5 rounded-lg"
+                            className="flex items-center gap-2 text-xs bg-black/5 dark:bg-white/5 px-2.5 py-1.5 rounded-lg"
                           >
-                            <FileText className="h-3.5 w-3.5" />
+                            <FileText className="h-3.5 w-3.5 shrink-0" />
                             <span className="truncate">{att.name}</span>
                           </div>
                         )
@@ -333,14 +462,14 @@ export function ChatInterface({
                   )}
 
                   {/* Embedded Structured Card */}
-                  {msg.card && <ChatStructuredCard card={msg.card} />}
+                  {msg.card && <ChatStructuredCard card={msg.card} options={msg.options} />}
 
-                  <div className="mt-1.5 flex items-center justify-end gap-2 text-[10px] opacity-70">
+                  <div className="mt-1 flex items-center justify-end gap-2 text-[10px] opacity-70">
                     <button
                       type="button"
                       aria-label="Copy message"
                       onClick={() => copyMessage(msg.id, msg.text)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
                     >
                       {copiedId === msg.id ? (
                         <Check className="h-3 w-3" />
@@ -349,7 +478,9 @@ export function ChatInterface({
                       )}
                     </button>
                     <span>{formatTime(msg.timestamp)}</span>
-                    {isUser && <CheckCheck className="h-3 w-3 text-[var(--status-success)]" />}
+                    {isUser && msg.status === "sent" && (
+                      <CheckCheck className="h-3 w-3 text-[var(--status-success)]" />
+                    )}
                     {msg.status === "failed" && (
                       <button
                         type="button"
@@ -357,9 +488,11 @@ export function ChatInterface({
                           sendMutation.mutate({
                             text: msg.text,
                             clientMessageId: msg.clientMessageId,
+                            source: msg.source,
+                            attachments: msg.attachments,
                           })
                         }
-                        className="text-[var(--status-danger)] flex items-center gap-1 cursor-pointer"
+                        className="text-[var(--status-danger)] flex items-center gap-1 cursor-pointer font-medium"
                       >
                         <RefreshCw className="h-3 w-3" /> Retry
                       </button>
@@ -369,7 +502,7 @@ export function ChatInterface({
 
                 {/* Interactive Option Buttons */}
                 {msg.options && msg.options.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {msg.options.map((opt) => (
                       <Button
                         key={opt.id}
@@ -392,71 +525,112 @@ export function ChatInterface({
                   </div>
                 )}
               </div>
-            </div>
+            </Wrapper>
           );
         })}
 
-        {sendMutation.isPending && (
-          <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-            <AiMunshiMascot size={24} />
-            <span className="px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-default)]">
-              AI Munshi likh raha hai...
-            </span>
+        <AnimatePresence>
+          {sendMutation.isPending && <TypingIndicator />}
+        </AnimatePresence>
+
+        {failedDraft && !sendMutation.isPending && (
+          <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[var(--status-danger-bg)] border border-[var(--status-danger)]/30 text-xs text-[var(--status-danger)]">
+            <span className="truncate">Message failed to send: &ldquo;{failedDraft.text}&rdquo;</span>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => sendMutation.mutate(failedDraft)}
+              className="h-7 px-2.5 text-xs shrink-0"
+            >
+              <RefreshCw className="h-3 w-3" /> Retry
+            </Button>
           </div>
         )}
       </div>
 
       {/* Scroll to bottom */}
       {showScrollBottom && (
-        <div className="relative">
+        <div className="relative h-0 shrink-0">
           <button
             type="button"
             aria-label="Scroll to bottom"
-            onClick={() => {
-              if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-            }}
-            className="absolute right-4 bottom-2 h-8 w-8 rounded-full bg-[var(--bg-card)] border border-[var(--border-default)] shadow-sm flex items-center justify-center cursor-pointer"
+            onClick={() => scrollToBottom(true)}
+            className="absolute end-3 bottom-2 z-10 h-8 w-8 rounded-full bg-[var(--bg-card)] border border-[var(--border-default)] shadow-[var(--shadow-sm)] flex items-center justify-center hover:border-[var(--brand-primary)] cursor-pointer"
           >
             <ArrowDown className="h-4 w-4" />
           </button>
         </div>
       )}
 
-      {/* Suggested Prompts */}
-      <div className="px-3 py-2 border-t border-[var(--border-default)] bg-[var(--bg-subtle)]/50 flex items-center gap-1.5 overflow-x-auto">
-        {SUGGESTED_PROMPTS.map((p) => (
+      {/* Short Quick-Action Chips (wrapping cleanly, zero horizontal scroll) */}
+      <div className="px-2.5 sm:px-3 py-1.5 border-t border-[var(--border-default)] bg-[var(--bg-subtle)]/60 shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {QUICK_ACTIONS.map((action, idx) => (
+            <button
+              key={action.label}
+              type="button"
+              disabled={sendMutation.isPending}
+              onClick={() => handleSend(action.prompt)}
+              className={cn(
+                "text-[11px] font-medium px-2.5 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-default)] text-[var(--text-primary)] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50",
+                idx >= 3 && !chipsExpandedMobile && "hidden sm:inline-flex"
+              )}
+            >
+              {action.label}
+            </button>
+          ))}
           <button
-            key={p}
             type="button"
-            onClick={() => handleSend(p)}
-            className="shrink-0 text-xs px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-default)] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors cursor-pointer"
+            onClick={() => setChipsExpandedMobile((v) => !v)}
+            className="sm:hidden text-[11px] font-medium px-2 py-1 rounded-full text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] inline-flex items-center gap-0.5 cursor-pointer"
           >
-            {p}
+            {chipsExpandedMobile ? (
+              <>
+                Less <ChevronUp className="h-3 w-3" />
+              </>
+            ) : (
+              <>
+                +3 more <ChevronDown className="h-3 w-3" />
+              </>
+            )}
           </button>
-        ))}
+        </div>
       </div>
 
       {/* Attachment Previews */}
       {attachments.length > 0 && (
-        <div className="px-4 py-2 border-t border-[var(--border-default)] bg-[var(--bg-card)] flex flex-wrap gap-2">
+        <div className="px-3 py-2 border-t border-[var(--border-default)] bg-[var(--bg-card)] flex flex-wrap gap-2 shrink-0">
           {attachments.map((att) => (
             <div
               key={att.id}
-              className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-default)] text-xs"
+              className="flex items-center gap-2 px-2 py-1 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-default)] text-xs max-w-[220px]"
             >
-              {att.kind === "audio" ? (
-                <Mic className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
+              {att.kind === "image" && att.dataUrl ? (
+                <img
+                  src={att.dataUrl}
+                  alt={att.name}
+                  className="h-7 w-7 rounded-lg object-cover shrink-0 border border-[var(--border-default)]"
+                />
+              ) : att.kind === "audio" ? (
+                <Mic className="h-3.5 w-3.5 text-[var(--brand-primary)] shrink-0" />
               ) : att.kind === "image" ? (
-                <ImageIcon className="h-3.5 w-3.5 text-[var(--status-info)]" />
+                <ImageIcon className="h-3.5 w-3.5 text-[var(--status-info)] shrink-0" />
               ) : (
-                <FileText className="h-3.5 w-3.5" />
+                <FileText className="h-3.5 w-3.5 shrink-0" />
               )}
-              <span className="max-w-[160px] truncate">{att.name}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-[11px]">{att.name}</p>
+                <p className="text-[10px] text-[var(--text-muted)]">
+                  {att.kind === "audio" && att.durationSec != null
+                    ? formatDuration(att.durationSec)
+                    : formatFileSize(att.sizeBytes)}
+                </p>
+              </div>
               <button
                 type="button"
                 aria-label="Remove attachment"
                 onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== att.id))}
-                className="text-[var(--text-muted)] hover:text-[var(--status-danger)] cursor-pointer"
+                className="text-[var(--text-muted)] hover:text-[var(--status-danger)] cursor-pointer shrink-0"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -465,21 +639,25 @@ export function ChatInterface({
         </div>
       )}
 
-      {/* Composer */}
-      <div className="p-3 border-t border-[var(--border-default)] bg-[var(--bg-card)] flex items-end gap-2">
+      {/* Composer (always pinned at bottom of chat container) */}
+      <div className="p-2 sm:p-2.5 border-t border-[var(--border-default)] bg-[var(--bg-card)] flex items-end gap-1.5 sm:gap-2 shrink-0">
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*,.pdf,.xlsx,.csv"
           multiple
           className="hidden"
-          onChange={(e) => handleFileSelect(e.target.files)}
+          onChange={(e) => {
+            handleFileSelect(e.target.files);
+            e.target.value = "";
+          }}
         />
         <Button
           variant="ghost"
           size="icon"
           aria-label="Upload file or bill"
           onClick={() => fileInputRef.current?.click()}
+          className="h-9 w-9 shrink-0"
         >
           <Plus className="h-4 w-4" />
         </Button>
@@ -488,34 +666,31 @@ export function ChatInterface({
           size="icon"
           aria-label="Attach image"
           onClick={() => fileInputRef.current?.click()}
+          className="hidden sm:inline-flex h-9 w-9 shrink-0"
         >
           <Paperclip className="h-4 w-4" />
         </Button>
 
         {isRecording ? (
-          <div className="flex-1 flex items-center justify-between px-3 h-9.5 rounded-xl bg-[var(--status-danger-bg)] text-[var(--status-danger)] text-xs font-medium">
-            <span className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[var(--status-danger)] animate-pulse" />
-              Recording ({recordingSec}s) — Simulated Voice Demo
+          <div className="flex-1 min-w-0 flex items-center justify-between gap-2 px-3 h-9 rounded-xl bg-[var(--status-danger-bg)] text-[var(--status-danger)] text-xs font-medium">
+            <span className="flex items-center gap-2 min-w-0 truncate">
+              <RecordingWaveform />
+              <span className="tabular-nums font-semibold">{formatDuration(recordingSec)}</span>
+              <span className="hidden sm:inline truncate">— Simulated Voice Demo</span>
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
                 onClick={stopVoiceRecording}
-                className="px-2 py-1 rounded-lg bg-[var(--status-danger)] text-white flex items-center gap-1 cursor-pointer"
+                className="px-2.5 py-1 rounded-lg bg-[var(--status-danger)] text-white flex items-center gap-1 cursor-pointer text-[11px]"
               >
                 <Square className="h-3 w-3" /> Stop
               </button>
               <button
                 type="button"
                 aria-label="Cancel recording"
-                onClick={() => {
-                  if (timerRef.current) clearInterval(timerRef.current);
-                  mediaRecorderRef.current?.stop();
-                  setIsRecording(false);
-                  setAttachments([]);
-                }}
-                className="p-1 cursor-pointer"
+                onClick={cancelVoiceRecording}
+                className="p-1 rounded-lg hover:bg-black/5 cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -528,13 +703,22 @@ export function ChatInterface({
               size="icon"
               aria-label="Record voice note"
               onClick={startVoiceRecording}
+              className="h-9 w-9 shrink-0"
             >
               <Mic className="h-4 w-4" />
             </Button>
             <textarea
+              ref={textareaRef}
               rows={1}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onFocus={() => {
+                setTimeout(() => scrollToBottom(true), 150);
+              }}
+              onChange={(e) => {
+                setInput(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 100)}px`;
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -542,13 +726,14 @@ export function ChatInterface({
                 }
               }}
               placeholder={t.chat.placeholder}
-              className="flex-1 resize-none rounded-xl border border-[var(--border-default)] bg-[var(--bg-app)] px-3 py-2 text-sm focus:border-[var(--brand-primary)] focus:outline-none max-h-28"
+              className="flex-1 min-w-0 resize-none rounded-xl border border-[var(--border-default)] bg-[var(--bg-app)] px-3 py-2 text-sm focus:border-[var(--brand-primary)] focus:outline-none max-h-24 leading-snug"
             />
             <Button
               size="icon"
               aria-label="Send message"
               onClick={() => handleSend()}
-              disabled={sendMutation.isPending}
+              disabled={sendMutation.isPending || (!input.trim() && attachments.length === 0)}
+              className="h-9 w-9 shrink-0"
             >
               <Send className="h-4 w-4" />
             </Button>
@@ -561,74 +746,106 @@ export function ChatInterface({
 
 function ChatStructuredCard({
   card,
+  options,
 }: {
   card: NonNullable<ChatMessage["card"]>;
+  options?: InteractiveOption[];
 }) {
   const d = card.data;
+
   if (card.type === "saved_transaction" || card.type === "draft_transaction") {
+    const isSaved = card.type === "saved_transaction";
+    const isReversed = d.status === "reversed";
+    const hasPendingConfirm =
+      card.type === "draft_transaction" &&
+      Boolean(options?.some((o) => !o.consumed && o.actionType === "CONFIRM_DRAFT_TRANSACTION"));
+
+    const badgeTone = isReversed
+      ? "danger"
+      : isSaved
+      ? "success"
+      : hasPendingConfirm
+      ? "warning"
+      : "neutral";
+
+    const badgeLabel = isReversed
+      ? "Reversed"
+      : isSaved
+      ? "Saved"
+      : hasPendingConfirm
+      ? "Pending Confirmation"
+      : "Draft";
+
     return (
-      <Card className="mt-2.5 p-3 bg-[var(--brand-cream)] border-[var(--border-default)]">
-        <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-[var(--border-default)]">
-          <span className="text-xs font-semibold text-[var(--text-primary)]">
+      <Card
+        className={cn(
+          "mt-2 p-2.5 sm:p-3 border-[var(--border-default)]",
+          isReversed ? "bg-[var(--status-danger-bg)]/50" : "bg-[var(--brand-cream)]"
+        )}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 mb-2 border-b border-[var(--border-default)]">
+          <span className="text-xs font-semibold text-[var(--text-primary)] truncate inline-flex items-center gap-1.5">
+            {isSaved && !isReversed && <AnimatedSuccess size={18} />}
             {String(d.title ?? "Transaction")}
           </span>
-          <Badge tone={card.type === "saved_transaction" ? "success" : "warning"}>
-            {card.type === "saved_transaction" ? "Saved" : "Draft"}
-          </Badge>
+          <Badge tone={badgeTone}>{badgeLabel}</Badge>
         </div>
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1 text-xs flex-1">
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--text-secondary)]">Party:</span>
-              <span className="font-medium">{String(d.partyName ?? "-")}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--text-secondary)]">Items:</span>
-              <span className="font-medium">{String(d.itemsSummary ?? "-")}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--text-secondary)]">Total Amount:</span>
-              <span className="font-semibold tabular-nums">
-                {formatPKR(Number(d.totalAmount ?? 0))}
-              </span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--text-secondary)]">Paid (Cash):</span>
-              <span className="font-semibold tabular-nums text-[var(--status-success)]">
-                {formatPKR(Number(d.paidAmount ?? 0))}
-              </span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--text-secondary)]">Udhaar (Balance):</span>
-              <span className="font-semibold tabular-nums text-[var(--brand-primary)]">
-                {formatPKR(Number(d.outstandingAmount ?? 0))}
-              </span>
-            </div>
+
+        <div className="space-y-1 text-xs">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[var(--text-secondary)] shrink-0">Party</span>
+            <span className="font-medium text-end truncate">{String(d.partyName ?? "-")}</span>
           </div>
-          {Boolean(d.serial) && (
-            <div className="shrink-0 rounded-xl border border-[var(--brand-primary)]/40 bg-[var(--bg-card)] px-2.5 py-2 text-center">
-              <p className="text-[10px] font-bold text-[var(--brand-primary)]">
-                {String(d.serial)}
-              </p>
-              <p className="text-[9px] text-[var(--text-secondary)]">
-                {String(d.transactionType ?? "")}
-              </p>
-              <p className="text-[9px] text-[var(--text-muted)] mt-0.5">{String(d.date ?? "")}</p>
-            </div>
-          )}
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[var(--text-secondary)] shrink-0">Items</span>
+            <span className="font-medium text-end truncate">{String(d.itemsSummary ?? "-")}</span>
+          </div>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[var(--text-secondary)] shrink-0">Total Amount</span>
+            <span className="font-semibold tabular-nums whitespace-nowrap">
+              {formatPKR(Number(d.totalAmount ?? 0))}
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[var(--text-secondary)] shrink-0">Paid (Cash)</span>
+            <span className="font-semibold tabular-nums whitespace-nowrap text-[var(--status-success)]">
+              {formatPKR(Number(d.paidAmount ?? 0))}
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[var(--text-secondary)] shrink-0">Udhaar (Balance)</span>
+            <span className="font-semibold tabular-nums whitespace-nowrap text-[var(--brand-primary)]">
+              {formatPKR(Number(d.outstandingAmount ?? 0))}
+            </span>
+          </div>
         </div>
+
+        {Boolean(d.serial) && (
+          <div className="mt-2 pt-1.5 border-t border-[var(--border-default)] flex flex-wrap items-center justify-between gap-2 text-[10px]">
+            <span className="font-bold text-[var(--brand-primary)] bg-[var(--bg-card)] border border-[var(--brand-primary)]/30 rounded-md px-2 py-0.5 whitespace-nowrap">
+              {String(d.serial)}
+            </span>
+            <span className="text-[var(--text-secondary)] truncate">
+              {[d.transactionType, d.date].filter(Boolean).map(String).join(" • ")}
+            </span>
+          </div>
+        )}
       </Card>
     );
   }
 
   if (card.type === "khata_statement") {
     return (
-      <Card className="mt-2.5 p-3 bg-[var(--bg-subtle)] text-xs space-y-1">
-        <p className="font-semibold text-sm">{String(d.partyName)}</p>
-        <p className="text-[var(--text-secondary)] capitalize">{String(d.partyType)}</p>
-        <div className="flex items-center justify-between pt-1">
-          <span>{String(d.direction)}</span>
-          <span className="font-bold text-sm tabular-nums">
+      <Card className="mt-2 p-2.5 bg-[var(--bg-subtle)] text-xs space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-semibold text-sm truncate">{String(d.partyName)}</p>
+          <Badge tone="neutral" className="capitalize">
+            {String(d.partyType)}
+          </Badge>
+        </div>
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <span className="text-[var(--text-secondary)]">{String(d.direction)}</span>
+          <span className="font-bold text-sm tabular-nums whitespace-nowrap">
             {formatPKR(Number(d.balance ?? 0))}
           </span>
         </div>
@@ -638,22 +855,28 @@ function ChatStructuredCard({
 
   if (card.type === "business_summary") {
     return (
-      <Card className="mt-2.5 p-3 bg-[var(--bg-subtle)] grid grid-cols-2 gap-2 text-xs">
-        <div>
-          <p className="text-[var(--text-secondary)]">Sales</p>
-          <p className="font-bold tabular-nums">{formatPKR(Number(d.sales ?? 0))}</p>
+      <Card className="mt-2 p-2.5 bg-[var(--bg-subtle)] grid grid-cols-2 gap-2.5 text-xs">
+        <div className="min-w-0">
+          <p className="text-[var(--text-secondary)] text-[11px]">Sales</p>
+          <p className="font-bold tabular-nums whitespace-nowrap">
+            {formatPKR(Number(d.sales ?? 0))}
+          </p>
         </div>
-        <div>
-          <p className="text-[var(--text-secondary)]">Purchases</p>
-          <p className="font-bold tabular-nums">{formatPKR(Number(d.purchases ?? 0))}</p>
+        <div className="min-w-0">
+          <p className="text-[var(--text-secondary)] text-[11px]">Purchases</p>
+          <p className="font-bold tabular-nums whitespace-nowrap">
+            {formatPKR(Number(d.purchases ?? 0))}
+          </p>
         </div>
-        <div>
-          <p className="text-[var(--text-secondary)]">Expenses</p>
-          <p className="font-bold tabular-nums">{formatPKR(Number(d.expenses ?? 0))}</p>
+        <div className="min-w-0">
+          <p className="text-[var(--text-secondary)] text-[11px]">Expenses</p>
+          <p className="font-bold tabular-nums whitespace-nowrap">
+            {formatPKR(Number(d.expenses ?? 0))}
+          </p>
         </div>
-        <div>
-          <p className="text-[var(--text-secondary)]">Net Profit</p>
-          <p className="font-bold tabular-nums text-[var(--status-success)]">
+        <div className="min-w-0">
+          <p className="text-[var(--text-secondary)] text-[11px]">Net Profit</p>
+          <p className="font-bold tabular-nums whitespace-nowrap text-[var(--status-success)]">
             {formatPKR(Number(d.netProfit ?? 0))}
           </p>
         </div>
@@ -664,10 +887,12 @@ function ChatStructuredCard({
   if (card.type === "inventory_summary") {
     const topLow = Array.isArray(d.topLowStock) ? (d.topLowStock as string[]) : [];
     return (
-      <Card className="mt-2.5 p-3 bg-[var(--bg-subtle)] text-xs space-y-1.5">
-        <div className="flex justify-between">
+      <Card className="mt-2 p-2.5 bg-[var(--bg-subtle)] text-xs space-y-1.5">
+        <div className="flex items-center justify-between gap-3">
           <span>Total Items: {String(d.totalItems)}</span>
-          <span className="font-bold tabular-nums">{formatPKR(Number(d.totalValue ?? 0))}</span>
+          <span className="font-bold tabular-nums whitespace-nowrap">
+            {formatPKR(Number(d.totalValue ?? 0))}
+          </span>
         </div>
         {topLow.length > 0 && (
           <p className="text-[var(--status-warning)]">Low Stock: {topLow.join(", ")}</p>
@@ -678,11 +903,24 @@ function ChatStructuredCard({
 
   if (card.type === "reversal_confirmation") {
     return (
-      <Card className="mt-2.5 p-3 bg-[var(--status-danger-bg)] text-xs">
-        <p className="font-semibold text-[var(--status-danger)]">
-          Reversed ({String(d.serial)})
+      <Card className="mt-2 p-2.5 bg-[var(--status-danger-bg)] border-[var(--status-danger)]/30 text-xs space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-semibold text-[var(--status-danger)] inline-flex items-center gap-1">
+            <RotateCcw className="h-3 w-3" /> Reversal Entry
+          </span>
+          <Badge tone="danger">Reversed</Badge>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[var(--text-secondary)] truncate">{String(d.particulars)}</span>
+          {d.amount != null && (
+            <span className="font-semibold tabular-nums whitespace-nowrap text-[var(--status-danger)]">
+              {formatPKR(Number(d.amount))}
+            </span>
+          )}
+        </div>
+        <p className="text-[10px] font-semibold text-[var(--status-danger)]">
+          Serial: {String(d.serial)}
         </p>
-        <p className="mt-0.5">{String(d.particulars)}</p>
       </Card>
     );
   }

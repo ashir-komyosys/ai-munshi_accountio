@@ -7,6 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Boxes, Package, Plus, Search } from "lucide-react";
 import { FinancialAmount } from "@/components/common/FinancialAmount";
 import { EmptyState, LoadingSkeleton, PageHeader } from "@/components/common/StatusStates";
+import { AnimatedCard } from "@/components/motion/AnimatedCard";
+import { AnimatedNumber } from "@/components/motion/AnimatedNumber";
 import { Badge, Button, Card, Input, Select } from "@/components/ui/primitives";
 import { formatPKR } from "@/lib/money";
 import { services } from "@/services";
@@ -76,25 +78,27 @@ export default function InventoryPage() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-4 flex items-center gap-3">
+        <AnimatedCard className="p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-[var(--status-success-bg)] text-[var(--status-success)] flex items-center justify-center">
             <Boxes className="h-5 w-5" />
           </div>
           <div>
             <p className="text-xs text-[var(--text-secondary)]">Total Items</p>
-            <p className="text-xl font-bold tabular-nums">{products.length}</p>
+            <p className="text-xl font-bold tabular-nums">
+              <AnimatedNumber value={products.length} />
+            </p>
           </div>
-        </Card>
-        <Card className="p-4 flex items-center gap-3">
+        </AnimatedCard>
+        <AnimatedCard delay={0.04} className="p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] flex items-center justify-center">
             <Package className="h-5 w-5" />
           </div>
           <div>
             <p className="text-xs text-[var(--text-secondary)]">Total Stock Value</p>
-            <FinancialAmount amount={totalValue} className="text-lg" />
+            <FinancialAmount amount={totalValue} animate className="text-lg" />
           </div>
-        </Card>
-        <Card className="p-4 flex items-center gap-3">
+        </AnimatedCard>
+        <AnimatedCard delay={0.08} className="p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-[var(--status-warning-bg)] text-[var(--status-warning)] flex items-center justify-center">
             <AlertTriangle className="h-5 w-5" />
           </div>
@@ -102,8 +106,8 @@ export default function InventoryPage() {
             <p className="text-xs text-[var(--text-secondary)]">Low Stock</p>
             <p className="text-xl font-bold tabular-nums">{lowStockCount} Items</p>
           </div>
-        </Card>
-        <Card className="p-4 flex items-center gap-3">
+        </AnimatedCard>
+        <AnimatedCard delay={0.12} className="p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-[var(--status-danger-bg)] text-[var(--status-danger)] flex items-center justify-center">
             <AlertTriangle className="h-5 w-5" />
           </div>
@@ -111,7 +115,7 @@ export default function InventoryPage() {
             <p className="text-xs text-[var(--text-secondary)]">Out of Stock</p>
             <p className="text-xl font-bold tabular-nums">{outOfStockCount} Items</p>
           </div>
-        </Card>
+        </AnimatedCard>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2.5">

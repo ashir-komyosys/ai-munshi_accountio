@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { AnimatedModal } from "@/components/motion/AnimatedModal";
 import { cn } from "@/lib/utils";
 
 export function Button({
@@ -35,7 +34,7 @@ export function Button({
     <button
       type={type}
       className={cn(
-        "inline-flex items-center justify-center font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]",
+        "inline-flex items-center justify-center font-medium transition-all duration-150 cursor-pointer active:scale-[0.98] disabled:active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]",
         variants[variant],
         sizes[size],
         className
@@ -139,38 +138,14 @@ export function Modal({
   maxWidth?: string;
 }) {
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px]" />
-        <DialogPrimitive.Content
-          className={cn(
-            "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[var(--border-default)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-md)] max-h-[90vh] overflow-y-auto",
-            maxWidth
-          )}
-        >
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <DialogPrimitive.Title className="font-heading text-lg font-semibold text-[var(--text-primary)]">
-                {title}
-              </DialogPrimitive.Title>
-              {description && (
-                <DialogPrimitive.Description className="text-xs text-[var(--text-secondary)] mt-0.5">
-                  {description}
-                </DialogPrimitive.Description>
-              )}
-            </div>
-            <DialogPrimitive.Close asChild>
-              <button
-                aria-label="Close dialog"
-                className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </DialogPrimitive.Close>
-          </div>
-          {children}
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+    <AnimatedModal
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description={description}
+      maxWidth={maxWidth}
+    >
+      {children}
+    </AnimatedModal>
   );
 }

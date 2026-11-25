@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
+import { MotionProvider } from "@/components/motion/MotionProvider";
 import { useUIStore } from "@/stores/uiStore";
 import { seedDemoDatabaseIfEmpty } from "@/database/seed";
 
@@ -62,20 +63,22 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {dbReady ? (
-        children
-      ) : (
-        <div className="min-h-screen flex items-center justify-center bg-[var(--bg-app)]">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-9 w-9 rounded-full border-3 border-[var(--brand-primary)] border-t-transparent animate-spin" />
-            <p className="text-sm font-medium text-[var(--text-secondary)]">
-              Loading Accountio AI Demo Workspace...
-            </p>
+    <MotionProvider>
+      <QueryClientProvider client={queryClient}>
+        {dbReady ? (
+          children
+        ) : (
+          <div className="min-h-screen flex items-center justify-center bg-[var(--bg-app)]">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-9 w-9 rounded-full border-3 border-[var(--brand-primary)] border-t-transparent animate-spin" />
+              <p className="text-sm font-medium text-[var(--text-secondary)]">
+                Loading Accountio AI Demo Workspace...
+              </p>
+            </div>
           </div>
-        </div>
-      )}
-      <Toaster richColors position="top-right" />
-    </QueryClientProvider>
+        )}
+        <Toaster richColors position="top-right" />
+      </QueryClientProvider>
+    </MotionProvider>
   );
 }

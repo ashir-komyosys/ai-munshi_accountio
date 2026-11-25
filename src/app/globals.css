@@ -146,6 +146,12 @@ h1, h2, h3, h4, .font-heading {
   border-radius: 9999px;
 }
 
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @media print {
   .no-print {
     display: none !important;

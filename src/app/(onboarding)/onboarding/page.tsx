@@ -4,18 +4,25 @@ import React from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Globe } from "lucide-react";
 import { AccountioLogo, AiMunshiMascot } from "@/components/common/BrandAssets";
-import { Button, Card } from "@/components/ui/primitives";
+import { AnimatedCard } from "@/components/motion/AnimatedCard";
+import { AnimatedPage } from "@/components/motion/AnimatedPage";
+import { Button } from "@/components/ui/primitives";
 import { useUIStore } from "@/stores/uiStore";
 
 export default function OnboardingWelcomePage() {
   const { locale, setLocale } = useUIStore();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-app)] p-4">
-      <Card className="w-full max-w-lg p-6 sm:p-8 space-y-6">
-        <div className="flex items-center justify-between">
-          <AccountioLogo />
-          <span className="text-xs font-medium text-[var(--text-secondary)]">Step 1 of 4</span>
+    <AnimatedPage className="min-h-screen flex items-center justify-center bg-[var(--bg-app)] p-4">
+      <AnimatedCard interactive={false} className="w-full max-w-lg p-6 sm:p-8 space-y-6">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <AccountioLogo />
+            <span className="text-xs font-medium text-[var(--text-secondary)]">Step 1 of 4</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-[var(--bg-subtle)] overflow-hidden">
+            <div className="h-full w-1/4 rounded-full bg-[var(--brand-primary)] transition-all duration-300" />
+          </div>
         </div>
 
         <div className="rounded-2xl bg-[var(--brand-cream)] border border-[var(--border-default)] p-5 flex items-center gap-4">
@@ -78,7 +85,7 @@ export default function OnboardingWelcomePage() {
             Continue <ArrowRight className="h-4 w-4" />
           </Button>
         </Link>
-      </Card>
-    </div>
+      </AnimatedCard>
+    </AnimatedPage>
   );
 }

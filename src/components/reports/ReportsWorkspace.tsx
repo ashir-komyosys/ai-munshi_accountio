@@ -3,9 +3,11 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { LayoutGroup } from "motion/react";
 import { Download, FileSpreadsheet, FileText, Printer, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSkeleton, PageHeader } from "@/components/common/StatusStates";
+import { SlidingIndicator } from "@/components/motion/SlidingIndicator";
 import { Badge, Button, Card, Input } from "@/components/ui/primitives";
 import { downloadCSV, downloadExcel, downloadPDF } from "@/lib/exportReports";
 import { addMoney, formatPKR, subMoney } from "@/lib/money";
@@ -193,48 +195,66 @@ export function ReportsWorkspace({ activeKey = "profit-loss" }: { activeKey?: Re
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Left Sub-Nav (Matches Screen 6) */}
-        <Card className="p-3 space-y-4 h-fit no-print">
-          <div>
-            <p className="px-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-              Financial Reports
-            </p>
-            <div className="space-y-1">
-              {FINANCIAL_REPORTS.map((r) => (
-                <Link
-                  key={r.key}
-                  href={`/app/reports/${r.key}`}
-                  className={`block px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                    activeKey === r.key
-                      ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] font-semibold"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]"
-                  }`}
-                >
-                  {r.label}
-                </Link>
-              ))}
+        <LayoutGroup id="reports-sub-nav">
+          <Card className="p-3 space-y-4 h-fit no-print">
+            <div>
+              <p className="px-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                Financial Reports
+              </p>
+              <div className="space-y-1">
+                {FINANCIAL_REPORTS.map((r) => {
+                  const active = activeKey === r.key;
+                  return (
+                    <Link
+                      key={r.key}
+                      href={`/app/reports/${r.key}`}
+                      className={`relative block px-3 py-2 rounded-xl text-xs font-medium transition-colors ${active
+                          ? "text-[var(--brand-primary)] font-semibold"
+                          : "text-[var(--text-secondary)] hover:bg-[var(--brand-cream)]"
+                        }`}
+                    >
+                      {active && (
+                        <SlidingIndicator
+                          layoutId="reports-active-pill"
+                          className="bg-[var(--brand-primary-soft)]"
+                        />
+                      )}
+                      <span className="relative z-10">{r.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-          <div>
-            <p className="px-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-              Business Reports
-            </p>
-            <div className="space-y-1">
-              {BUSINESS_REPORTS.map((r) => (
-                <Link
-                  key={r.key}
-                  href={`/app/reports/${r.key}`}
-                  className={`block px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                    activeKey === r.key
-                      ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] font-semibold"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]"
-                  }`}
-                >
-                  {r.label}
-                </Link>
-              ))}
+            <div>
+              <p className="px-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                Business Reports
+              </p>
+              <div className="space-y-1">
+                {BUSINESS_REPORTS.map((r) => {
+                  const active = activeKey === r.key;
+                  return (
+                    <Link
+                      key={r.key}
+                      href={`/app/reports/${r.key}`}
+                      className={`relative block px-3 py-2 rounded-xl text-xs font-medium transition-colors ${active
+                          ? "text-[var(--brand-primary)] font-semibold"
+                          : "text-[var(--text-secondary)] hover:bg-[var(--brand-cream)]"
+                        }`}
+                    >
+                      {active && (
+                        <SlidingIndicator
+                          layoutId="reports-active-pill"
+                          className="bg-[var(--brand-primary-soft)]"
+                        />
+                      )}
+                      <span className="relative z-10">{r.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </LayoutGroup>
 
         {/* Right Report Statement Panel */}
         <Card className="p-5 lg:col-span-3 space-y-4">

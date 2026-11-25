@@ -248,6 +248,134 @@ export async function processSimulatedMunshiMessage(params: {
     };
   }
 
+  // 2b. Receive Payment (Customer Receipt) pattern
+  if (
+    lower.includes("receive payment") ||
+    lower.includes("wasool") ||
+    lower.includes("receipt") ||
+    (lower.includes("receive") && !lower.includes("payable"))
+  ) {
+    const amount = parseAmount(text) ?? 50000;
+    const parties = await db.parties.where("bookId").equals(bookId).toArray();
+    const matchedParty =
+      parties.find((p) => lower.includes(p.name.toLowerCase().split(" ")[0])) ??
+      parties.find((p) => p.type === "customer");
+    const partyName = matchedParty?.name ?? "Ibrahim Traders";
+
+    return {
+      id: msgId,
+      conversationId,
+      bookId,
+      clientMessageId: generateId("cm"),
+      sender: "munshi",
+      text: `Theek hai! ${partyName} se ${formatPKR(amount)} ki wasooli (Receipt) ka draft tayyar hai:`,
+      timestamp: now,
+      status: "sent",
+      source: "web",
+      card: {
+        type: "draft_transaction",
+        data: {
+          title: "Customer Receipt (Raqam Wasooli)",
+          txType: "customer_receipt",
+          partyName,
+          itemsSummary: "Cash / Bank Receipt against Khata",
+          totalAmount: amount,
+          paidAmount: amount,
+          outstandingAmount: 0,
+        },
+      },
+      options: [
+        {
+          id: generateId("opt"),
+          messageId: msgId,
+          label: "Confirm & Save Receipt",
+          variant: "primary",
+          actionType: "CONFIRM_DRAFT_TRANSACTION",
+          payload: {
+            txType: "customer_receipt",
+            partyId: matchedParty?.id,
+            partyName,
+            particulars: `Payment received from ${partyName}`,
+            totalAmount: amount,
+            paidAmount: amount,
+          },
+        },
+        {
+          id: generateId("opt"),
+          messageId: msgId,
+          label: "Cancel",
+          variant: "secondary",
+          actionType: "DISMISS_PROMPT",
+          payload: {},
+        },
+      ],
+    };
+  }
+
+  // 2c. Pay Supplier (Supplier Payment) pattern
+  if (
+    lower.includes("pay supplier") ||
+    lower.includes("ada") ||
+    lower.includes("payment to") ||
+    (lower.includes("pay ") && !lower.includes("payable"))
+  ) {
+    const amount = parseAmount(text) ?? 50000;
+    const parties = await db.parties.where("bookId").equals(bookId).toArray();
+    const matchedParty =
+      parties.find((p) => lower.includes(p.name.toLowerCase().split(" ")[0])) ??
+      parties.find((p) => p.type === "supplier");
+    const partyName = matchedParty?.name ?? "Ali Traders";
+
+    return {
+      id: msgId,
+      conversationId,
+      bookId,
+      clientMessageId: generateId("cm"),
+      sender: "munshi",
+      text: `Ji bilkul! ${partyName} ko ${formatPKR(amount)} ki adaaigi (Supplier Payment) ka draft tayyar hai:`,
+      timestamp: now,
+      status: "sent",
+      source: "web",
+      card: {
+        type: "draft_transaction",
+        data: {
+          title: "Supplier Payment (Raqam Adaaigi)",
+          txType: "supplier_payment",
+          partyName,
+          itemsSummary: "Payment against Supplier Khata",
+          totalAmount: amount,
+          paidAmount: amount,
+          outstandingAmount: 0,
+        },
+      },
+      options: [
+        {
+          id: generateId("opt"),
+          messageId: msgId,
+          label: "Confirm & Save Payment",
+          variant: "primary",
+          actionType: "CONFIRM_DRAFT_TRANSACTION",
+          payload: {
+            txType: "supplier_payment",
+            partyId: matchedParty?.id,
+            partyName,
+            particulars: `Payment to ${partyName}`,
+            totalAmount: amount,
+            paidAmount: amount,
+          },
+        },
+        {
+          id: generateId("opt"),
+          messageId: msgId,
+          label: "Cancel",
+          variant: "secondary",
+          actionType: "DISMISS_PROMPT",
+          payload: {},
+        },
+      ],
+    };
+  }
+
   // 3. Expense pattern
   if (lower.includes("kharcha") || lower.includes("expense") || lower.includes("bill") || lower.includes("rent")) {
     const total = parseAmount(text) ?? 5000;

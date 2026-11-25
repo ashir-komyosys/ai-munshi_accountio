@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import { Phone, Mail, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AccountioLogo, AiMunshiMascot } from "@/components/common/BrandAssets";
-import { Badge, Button, Card, Input } from "@/components/ui/primitives";
+import { AnimatedCard } from "@/components/motion/AnimatedCard";
+import { AnimatedPage } from "@/components/motion/AnimatedPage";
+import { AnimatedTabs } from "@/components/motion/AnimatedTabs";
+import { Badge, Button, Input } from "@/components/ui/primitives";
 import { services } from "@/services";
 import { useUIStore } from "@/stores/uiStore";
 
@@ -39,8 +42,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-app)] p-4">
-      <Card className="w-full max-w-md p-6 sm:p-8 space-y-6">
+    <AnimatedPage className="min-h-screen flex items-center justify-center bg-[var(--bg-app)] p-4">
+      <AnimatedCard interactive={false} className="w-full max-w-md p-6 sm:p-8 space-y-6">
         <div className="flex items-center justify-between">
           <AccountioLogo />
           <Badge tone="brand">Simulated Auth</Badge>
@@ -56,32 +59,35 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[var(--bg-subtle)]">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("phone");
-              setIdentifier("3008664123");
-            }}
-            className={`py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer ${
-              mode === "phone" ? "bg-[var(--bg-card)] shadow-xs text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
-            }`}
-          >
-            <Phone className="h-3.5 w-3.5" /> Phone (+92)
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("email");
-              setIdentifier("owner@almadinayarn.pk");
-            }}
-            className={`py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer ${
-              mode === "email" ? "bg-[var(--bg-card)] shadow-xs text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
-            }`}
-          >
-            <Mail className="h-3.5 w-3.5" /> Email
-          </button>
-        </div>
+        <AnimatedTabs
+          layoutId="login-mode-tabs"
+          variant="segmented"
+          className="w-full grid grid-cols-2"
+          itemClassName="justify-center py-1.5"
+          value={mode}
+          onChange={(next) => {
+            setMode(next);
+            setIdentifier(next === "phone" ? "3008664123" : "owner@almadinayarn.pk");
+          }}
+          items={[
+            {
+              value: "phone",
+              label: (
+                <span className="inline-flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5" /> Phone (+92)
+                </span>
+              ),
+            },
+            {
+              value: "email",
+              label: (
+                <span className="inline-flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5" /> Email
+                </span>
+              ),
+            },
+          ]}
+        />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -131,7 +137,7 @@ export default function LoginPage() {
             Forgot password?
           </Link>
         </div>
-      </Card>
-    </div>
+      </AnimatedCard>
+    </AnimatedPage>
   );
 }

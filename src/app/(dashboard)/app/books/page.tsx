@@ -6,7 +6,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, BookOpen, Check, Plus, RotateCcw, Search, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSkeleton, PageHeader } from "@/components/common/StatusStates";
-import { Badge, Button, Card, Input } from "@/components/ui/primitives";
+import { AnimatedCard } from "@/components/motion/AnimatedCard";
+import { AnimatedTabs } from "@/components/motion/AnimatedTabs";
+import { Badge, Button, Input } from "@/components/ui/primitives";
 import { formatShortDate } from "@/lib/utils";
 import { services } from "@/services";
 import { useUIStore } from "@/stores/uiStore";
@@ -76,27 +78,25 @@ export default function MyBooksPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex gap-1.5">
-          {(["all", "active", "archived"] as const).map((s) => (
-            <Button
-              key={s}
-              size="sm"
-              variant={statusFilter === s ? "primary" : "outline"}
-              onClick={() => setStatusFilter(s)}
-              className="capitalize"
-            >
-              {s}
-            </Button>
-          ))}
-        </div>
+        <AnimatedTabs
+          layoutId="books-status-tabs"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          items={[
+            { value: "all", label: "All" },
+            { value: "active", label: "Active" },
+            { value: "archived", label: "Archived" },
+          ]}
+        />
       </div>
 
       <div className="space-y-3">
-        {filtered.map((book) => {
+        {filtered.map((book, idx) => {
           const isCurrent = book.id === activeBookId;
           return (
-            <Card
+            <AnimatedCard
               key={book.id}
+              delay={idx * 0.04}
               className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                 isCurrent ? "border-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]/20" : ""
               }`}
@@ -163,7 +163,7 @@ export default function MyBooksPage() {
                   </Button>
                 )}
               </div>
-            </Card>
+            </AnimatedCard>
           );
         })}
       </div>
