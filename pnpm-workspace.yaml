@@ -1,6 +1,5 @@
 packages:
   - '.'
 
-onlyBuiltDependencies:
-  - core-js
-  - "@tanstack/react-table"
+allowBuilds:
+  core-js: true
