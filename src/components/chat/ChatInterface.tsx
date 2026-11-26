@@ -39,7 +39,7 @@ import { formatPKR } from "@/lib/money";
 import { cn, formatTime, generateId } from "@/lib/utils";
 import { services } from "@/services";
 import { useUIStore } from "@/stores/uiStore";
-import type { ChatAttachment, ChatMessage, InteractiveOption } from "@/types";
+import type { Book, ChatAttachment, ChatMessage, InteractiveOption } from "@/types";
 
 const QUICK_ACTIONS = [
   { label: "New Sale", prompt: "Ibrahim Traders ko 90,000 ka maal udhaar becha" },
@@ -109,6 +109,18 @@ export function ChatInterface({
     queryFn: () => services.chat.getOrCreateConversation(activeBookId),
   });
 
+  const { data: aiBooks = [] } = useQuery({
+    queryKey: ["books"],
+    queryFn: () => services.books.listBooks(),
+  });
+  const { data: aiParties = [] } = useQuery({
+    queryKey: ["parties", activeBookId],
+    queryFn: () => services.khatas.listParties(activeBookId),
+  });
+  const { data: aiProducts = [] } = useQuery({ queryKey: ["products", activeBookId], queryFn: () => services.inventory.listProducts(activeBookId) });
+  const { data: aiAccounts = [] } = useQuery({ queryKey: ["accounts", activeBookId], queryFn: () => services.cashBank.listAccounts(activeBookId) });
+  const { data: aiTransactions = [] } = useQuery({ queryKey: ["transactions", activeBookId], queryFn: () => services.transactions.listTransactions(activeBookId) });
+
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["messages", conversation?.id],
     queryFn: () => services.chat.listMessages(conversation!.id),
@@ -155,14 +167,25 @@ export function ChatInterface({
       attachments?: ChatAttachment[];
     }) => {
       if (!conversation) throw new Error("Conversation not ready");
-      return services.chat.sendMessage({
-        conversationId: conversation.id,
-        bookId: activeBookId,
-        text: vars.text,
-        clientMessageId: vars.clientMessageId,
-        source: vars.source,
-        attachments: vars.attachments,
+      if (vars.attachments?.length) {
+        return services.chat.sendMessage({ conversationId: conversation.id, bookId: activeBookId, text: vars.text, clientMessageId: vars.clientMessageId, source: vars.source, attachments: vars.attachments });
+      }
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: vars.text,
+          bookId: activeBookId,
+          books: aiBooks.slice(0, 20).map(({ id, name, businessType, status }) => ({ id, name, businessType, status })),
+          parties: aiParties.slice(0, 50).map(({ id, name, type }) => ({ id, name, type })),
+          products: aiProducts.slice(0, 50).map(({ id, name, sku, unit, quantity }) => ({ id, name, sku, unit, quantity })),
+          accounts: aiAccounts.slice(0, 20).map(({ id, name, type }) => ({ id, name, type })),
+          transactions: aiTransactions.slice(0, 50).map(({ id, particulars, type, status }) => ({ id, particulars, type, status })),
+        }),
       });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "AI request failed");
+      return services.chat.saveAiExchange({ conversationId: conversation.id, bookId: activeBookId, text: vars.text, clientMessageId: vars.clientMessageId, reply: result.summary, action: result.action });
     },
     onSuccess: () => {
       setFailedDraft(null);
@@ -177,6 +200,51 @@ export function ChatInterface({
   const optionMutation = useMutation({
     mutationFn: async (vars: { messageId: string; option: InteractiveOption }) => {
       if (!conversation) throw new Error("Conversation not ready");
+      if (vars.option.actionType === "AI_CANCEL") {
+        await services.chat.consumeAiOption(vars.messageId, vars.option.id);
+        return null;
+      }
+      if (vars.option.actionType.startsWith("AI_")) {
+        const data = vars.option.payload;
+        const action = vars.option.actionType.slice(3).toLowerCase();
+        if (action === "create_book") await services.books.createBook({ name: String(data.name), businessType: String(data.businessType), openingCash: Number(data.openingCash), openingBank: Number(data.openingBank) });
+        else if (action === "update_book") {
+          const patch: Partial<Book> = {};
+          if (typeof data.name === "string") patch.name = data.name;
+          if (typeof data.businessType === "string") patch.businessType = data.businessType;
+          await services.books.updateBook(String(data.id), patch);
+        } else if (action === "archive_book") await services.books.archiveBook(String(data.id));
+        else if (action === "restore_book") await services.books.restoreBook(String(data.id));
+        else if (action === "create_khata") await services.khatas.createParty({ bookId: activeBookId, name: String(data.name), type: data.type as "customer" | "supplier" | "other", phone: String(data.phone), openingBalance: Number(data.openingBalance), openingDirection: data.openingDirection as "receivable" | "payable" });
+        else if (action === "update_khata") {
+          const patch: Record<string, string> = {};
+          for (const field of ["name", "phone", "address", "notes"] as const) {
+            if (typeof data[field] === "string") patch[field] = data[field] as string;
+          }
+          await services.khatas.updateParty(String(data.id), patch);
+        }
+        else if (action === "delete_khata") await services.khatas.deleteParty(String(data.id));
+        else if (action === "create_expense") {
+          const account = aiAccounts.find((item) => item.id === String(data.accountId));
+          if (!account) throw new Error("The selected account is no longer available.");
+          await services.transactions.createTransaction({ bookId: activeBookId, date: String(data.date || new Date().toISOString().slice(0, 10)), type: "expense", particulars: String(data.particulars), accountId: account.id, paymentMethod: account.type, totalAmount: Number(data.totalAmount), paidAmount: Number(data.totalAmount), notes: data.notes ? String(data.notes) : undefined, source: "ai_munshi" });
+        }
+        else if (action === "create_transaction") await services.transactions.createTransaction({ bookId: activeBookId, date: String(data.date), type: data.transactionType as import("@/types").TransactionType, particulars: String(data.particulars), accountId: data.accountId ? String(data.accountId) : undefined, partyId: data.partyId ? String(data.partyId) : undefined, paymentMethod: data.paymentMethod as import("@/types").AccountType | "credit", totalAmount: Number(data.totalAmount), paidAmount: Number(data.paidAmount), notes: data.notes ? String(data.notes) : undefined, source: "ai_munshi" });
+        else if (action === "create_product") await services.inventory.createProduct({ bookId: activeBookId, name: String(data.name), sku: String(data.sku || ""), category: String(data.category || "General"), unit: data.unit as "kg" | "gram" | "meter" | "yard" | "piece" | "bag" | "carton" | "roll", quantity: Number(data.quantity), lowStockThreshold: Number(data.lowStockThreshold || 0), purchaseCost: Number(data.purchaseCost), sellingPrice: Number(data.sellingPrice) });
+        else if (action === "adjust_stock") await services.inventory.recordStockMovement({ bookId: activeBookId, productId: String(data.productId), type: data.movement as "in" | "out" | "adjustment", quantity: Number(data.quantity), unitCost: Number(data.unitCost), reason: String(data.reason), date: new Date().toISOString().slice(0, 10) });
+        else if (action === "archive_product") await services.inventory.archiveProduct(String(data.productId));
+        else if (action === "update_product") {
+          const patch: Record<string, string | number> = {};
+          for (const field of ["name", "sku", "category", "unit", "lowStockThreshold", "purchaseCost", "sellingPrice"] as const) {
+            if (typeof data[field] === "string" || typeof data[field] === "number") patch[field] = data[field] as string | number;
+          }
+          const productId = data.productId;
+          await services.inventory.updateProduct(String(productId), patch);
+        }
+        else if (action === "reverse_transaction") await services.transactions.reverseTransaction(String(data.transactionId), String(data.reason));
+        await services.chat.consumeAiOption(vars.messageId, vars.option.id);
+        return null;
+      }
       if (vars.option.actionType === "OPEN_TRANSACTION") {
         const txId = String(vars.option.payload.transactionId);
         if (compact) closeMunshiDrawer();
@@ -204,6 +272,12 @@ export function ChatInterface({
     },
     onSuccess: () => {
       invalidateAccounting();
+      queryClient.invalidateQueries({ queryKey: ["books"] });
+      queryClient.invalidateQueries({ queryKey: ["parties", activeBookId] });
+      queryClient.invalidateQueries({ queryKey: ["products", activeBookId] });
+      queryClient.invalidateQueries({ queryKey: ["accounts", activeBookId] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", activeBookId] });
+      queryClient.invalidateQueries({ queryKey: ["messages", conversation?.id] });
     },
     onError: (err: Error) => {
       toast.error(err.message || "Action failed. Please try again.");

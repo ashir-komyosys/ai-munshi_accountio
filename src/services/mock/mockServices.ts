@@ -22,6 +22,7 @@ import type {
 } from "@/services/contracts";
 import { postAtomicTransaction, reverseAtomicTransaction } from "./accountingEngine";
 import { executeInteractiveOption, processSimulatedMunshiMessage } from "./chatEngine";
+import type { ChatMessage } from "@/types";
 
 export const mockAuthService: AuthService = {
   async loginWithIdentifier(identifier) {
@@ -151,6 +152,11 @@ export const mockKhatasService: KhatasService = {
     const p = await db.parties.get(partyId);
     if (!p) throw new Error("Party not found");
     return p;
+  },
+  async deleteParty(partyId) {
+    const transactions = await db.transactions.where("partyId").equals(partyId).count();
+    if (transactions > 0) throw new Error("This khata has transaction history and cannot be deleted. Archive it instead.");
+    await db.parties.delete(partyId);
   },
   async getPartyTransactions(partyId) {
     const list = await db.transactions.where("partyId").equals(partyId).toArray();
@@ -618,6 +624,38 @@ export const mockChatService: ChatService = {
     });
 
     return { userMessage, munshiReply };
+  },
+  async saveAiExchange(input) {
+    const now = new Date().toISOString();
+    const userMessage: ChatMessage = {
+      id: generateId("msg"), conversationId: input.conversationId, bookId: input.bookId,
+      clientMessageId: input.clientMessageId, sender: "user", text: input.text,
+      timestamp: now, status: "sent", source: "web",
+    };
+    const pending = input.action && input.action.type !== "answer";
+    const munshiReply: ChatMessage = {
+      id: generateId("msg"), conversationId: input.conversationId, bookId: input.bookId,
+      clientMessageId: generateId("cm"), sender: "munshi", text: input.reply,
+      timestamp: new Date(Date.now() + 1).toISOString(), status: "sent", source: "web",
+      options: pending ? [
+        { id: generateId("opt"), messageId: "", label: "Confirm change", variant: "primary", actionType: `AI_${input.action!.type.toUpperCase()}`, payload: input.action!.data ?? {} },
+        { id: generateId("opt"), messageId: "", label: "Cancel", variant: "secondary", actionType: "AI_CANCEL", payload: {} },
+      ] : undefined,
+    };
+    munshiReply.options?.forEach((option) => { option.messageId = munshiReply.id; });
+    await db.transaction("rw", [db.messages, db.conversations], async () => {
+      await db.messages.put(userMessage);
+      await db.messages.put(munshiReply);
+      await db.conversations.update(input.conversationId, { updatedAt: munshiReply.timestamp });
+    });
+    return { userMessage, munshiReply };
+  },
+  async consumeAiOption(messageId, optionId) {
+    const message = await db.messages.get(messageId);
+    if (!message?.options) return;
+    await db.messages.update(messageId, {
+      options: message.options.map((option) => option.id === optionId ? { ...option, consumed: true } : option),
+    });
   },
   async triggerOption(input) {
     const orig = await db.messages.get(input.messageId);

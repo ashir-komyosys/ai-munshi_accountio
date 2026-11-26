@@ -61,6 +61,7 @@ export interface KhatasService {
     notes?: string;
   }): Promise<Party>;
   updateParty(partyId: string, patch: Partial<Party>): Promise<Party>;
+  deleteParty(partyId: string): Promise<void>;
   getPartyTransactions(partyId: string): Promise<Transaction[]>;
 }
 
@@ -207,6 +208,15 @@ export interface ChatService {
     source?: ChatMessage["source"];
     attachments?: ChatAttachment[];
   }): Promise<{ userMessage: ChatMessage; munshiReply: ChatMessage }>;
+  saveAiExchange(input: {
+    conversationId: string;
+    bookId: string;
+    text: string;
+    clientMessageId: string;
+    reply: string;
+    action?: { type: string; summary: string; data?: Record<string, unknown> };
+  }): Promise<{ userMessage: ChatMessage; munshiReply: ChatMessage }>;
+  consumeAiOption(messageId: string, optionId: string): Promise<void>;
   triggerOption(input: {
     conversationId: string;
     bookId: string;
